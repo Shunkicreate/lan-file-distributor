@@ -1,0 +1,18 @@
+FROM golang:1.23-alpine
+
+# 作業ディレクトリを設定
+WORKDIR /app
+
+# ソースコードをコピー
+COPY . .
+
+# 必要なパッケージのインストール（gitとwatchexec）
+RUN apk upgrade --no-cache && \
+    apk add --no-cache git && \
+    apk add --no-cache -X http://dl-cdn.alpinelinux.org/alpine/edge/community watchexec
+
+# Goモジュールの依存関係をダウンロード
+RUN go mod download
+
+# ホットリロード用コマンド
+CMD ["watchexec", "-w", ".", "--force-poll", "100", "-r", "go", "run", "cmd/server/main.go"]

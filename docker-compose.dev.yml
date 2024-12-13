@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  app-dev:
+    container_name: photo_viewer_backend_dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev  # 開発環境用のDockerfile
+    volumes:
+      - .:/app  # ホットリロード用にソースコードをコンテナにマウント
+      - "${HOST_NAS_PATH}:${NAS_PATH}"
+    ports:
+      - "${PORT}:${PORT}"
+    environment:
+      - ENV=development
+      - NAS_PATH=${NAS_PATH}
+      - PORT=${PORT}
+      - HOST_NAS_PATH=${HOST_NAS_PATH}

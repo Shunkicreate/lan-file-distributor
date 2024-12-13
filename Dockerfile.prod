@@ -1,0 +1,22 @@
+# 本番環境用ステージ
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /app
+
+# ソースコードをコピー
+COPY . .
+
+# Goモジュールのインストール
+RUN go mod tidy
+
+# 本番用にバイナリをビルド
+RUN GOOS=linux GOARCH=amd64 go build -o api-server .
+
+# 本番用ステージ
+FROM gcr.io/distroless/base
+
+# ビルドしたバイナリをコピー
+COPY --from=builder /app/api-server /api-server
+
+# バイナリを実行
+CMD ["/api-server"]
