@@ -17,10 +17,10 @@ import (
 
 type FileRepository interface {
 	ListFiles(folder string) ([]model.File, error)
-	GetFile(path string, width, height uint) (image.Image, error)
-	GetFiles(paths []string, width, height uint) ([]image.Image, error)
+	GetFile(path string, width, height uint) (*model.ImageFile, error)
+	GetFiles(paths []string, width, height uint) ([]*model.ImageFile, error)
 	GetFilePaths(folder string) ([]string, error)
-	GetRandomFiles(folder string, count int, width, height uint) ([]image.Image, error)
+	GetRandomFiles(folder string, count int, width, height uint) ([]*model.ImageFile, error)
 }
 
 type fileRepository struct {
@@ -52,9 +52,14 @@ func (r *fileRepository) ListFiles(folder string) ([]model.File, error) {
 }
 
 // GetFile retrieves and optionally resizes a single image file.
-func (r *fileRepository) GetFile(path string, width, height uint) (image.Image, error) {
+func (r *fileRepository) GetFile(path string, width, height uint) (*model.ImageFile, error) {
 	if !isSupportedImage(path) {
 		return nil, fmt.Errorf("unsupported image format (only JPG/JPEG supported): %s", path)
+	}
+
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get file info: %v", err)
 	}
 
 	file, err := os.Open(path)
@@ -82,16 +87,23 @@ func (r *fileRepository) GetFile(path string, width, height uint) (image.Image, 
 
 	if (width > 0 || height > 0) && 
 	   (uint(img.Bounds().Dx()) != width || uint(img.Bounds().Dy()) != height) {
-		return resize.Resize(width, height, img, resize.Lanczos3), nil
+		img = resize.Resize(width, height, img, resize.Lanczos3)
 	}
 
-	return img, nil
+	return &model.ImageFile{
+		Image:    img,
+		Path:     path,
+		Name:     filepath.Base(path),
+		Size:     fileInfo.Size(),
+		Width:    img.Bounds().Dx(),
+		Height:   img.Bounds().Dy(),
+	}, nil
 }
 
 // GetFiles retrieves and optionally resizes multiple images concurrently.
-func (r *fileRepository) GetFiles(paths []string, width, height uint) ([]image.Image, error) {
+func (r *fileRepository) GetFiles(paths []string, width, height uint) ([]*model.ImageFile, error) {
 	var (
-		images  = make([]image.Image, len(paths))
+		images  = make([]*model.ImageFile, len(paths))
 		errChan = make(chan error, len(paths))
 		wg      sync.WaitGroup
 	)
@@ -141,7 +153,7 @@ func (r *fileRepository) GetFilePaths(folder string) ([]string, error) {
 }
 
 // GetRandomFiles retrieves a specified number of random images.
-func (r *fileRepository) GetRandomFiles(folder string, count int, width, height uint) ([]image.Image, error) {
+func (r *fileRepository) GetRandomFiles(folder string, count int, width, height uint) ([]*model.ImageFile, error) {
 	paths, err := r.GetFilePaths(folder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file paths: %v", err)
@@ -152,12 +164,7 @@ func (r *fileRepository) GetRandomFiles(folder string, count int, width, height 
 	}
 
 	selectedPaths := randomSample(paths, count)
-	images, err := r.GetFiles(selectedPaths, width, height)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get files: %v", err)
-	}
-
-	return images, nil
+	return r.GetFiles(selectedPaths, width, height)
 }
 
 // Helper functions
