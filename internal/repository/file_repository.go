@@ -3,10 +3,9 @@ package repository
 import (
 	"fmt"
 	"github.com/nfnt/resize"
+	"github.com/pixiv/go-libjpeg/jpeg"
 	"image"
-	_ "image/gif"  // GIFサポート
-	_ "image/jpeg" // JPEGサポート
-	_ "image/png"  // PNGサポート
+	_ "image/jpeg" // JPEGサポートのみ残す
 	"io/ioutil"
 	"lan-file-distributor/internal/model"
 	"math/rand"
@@ -14,7 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 )
 
 type FileRepository interface {
@@ -56,7 +54,7 @@ func (r *fileRepository) ListFiles(folder string) ([]model.File, error) {
 // GetFile retrieves and optionally resizes a single image file.
 func (r *fileRepository) GetFile(path string, width, height uint) (image.Image, error) {
 	if !isSupportedImage(path) {
-		return nil, fmt.Errorf("unsupported image format: %s", filepath.Ext(path))
+		return nil, fmt.Errorf("unsupported image format (only JPG/JPEG supported): %s", path)
 	}
 
 	file, err := os.Open(path)
@@ -65,28 +63,44 @@ func (r *fileRepository) GetFile(path string, width, height uint) (image.Image, 
 	}
 	defer file.Close()
 
-	img, _, err := image.Decode(file)
+	options := &jpeg.DecoderOptions{
+		DCTMethod:              jpeg.DCTIFast,
+		DisableFancyUpsampling: true,
+		DisableBlockSmoothing:  true,
+		ScaleTarget: image.Rectangle{
+			Max: image.Point{
+				X: int(width),
+				Y: int(height),
+			},
+		},
+	}
+
+	img, err := jpeg.Decode(file, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode image: %v", err)
 	}
 
-	if width > 0 || height > 0 {
+	if (width > 0 || height > 0) && 
+	   (uint(img.Bounds().Dx()) != width || uint(img.Bounds().Dy()) != height) {
 		return resize.Resize(width, height, img, resize.Lanczos3), nil
 	}
+
 	return img, nil
 }
 
 // GetFiles retrieves and optionally resizes multiple images concurrently.
 func (r *fileRepository) GetFiles(paths []string, width, height uint) ([]image.Image, error) {
 	var (
-		images   = make([]image.Image, len(paths))
-		errChan  = make(chan error, len(paths))
-		wg       sync.WaitGroup
+		images  = make([]image.Image, len(paths))
+		errChan = make(chan error, len(paths))
+		wg      sync.WaitGroup
 	)
+
 	for i, path := range paths {
 		wg.Add(1)
 		go func(index int, filePath string) {
 			defer wg.Done()
+
 			img, err := r.GetFile(filePath, width, height)
 			if err != nil {
 				errChan <- fmt.Errorf("failed to process file %s: %v", filePath, err)
@@ -95,12 +109,14 @@ func (r *fileRepository) GetFiles(paths []string, width, height uint) ([]image.I
 			images[index] = img
 		}(i, path)
 	}
+
 	wg.Wait()
 	close(errChan)
 
 	if len(errChan) > 0 {
 		return nil, <-errChan
 	}
+
 	return images, nil
 }
 
@@ -128,17 +144,20 @@ func (r *fileRepository) GetFilePaths(folder string) ([]string, error) {
 func (r *fileRepository) GetRandomFiles(folder string, count int, width, height uint) ([]image.Image, error) {
 	paths, err := r.GetFilePaths(folder)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get file paths: %v", err)
 	}
 
 	if count > len(paths) {
 		count = len(paths)
 	}
 
-	rand.Seed(time.Now().UnixNano())
 	selectedPaths := randomSample(paths, count)
+	images, err := r.GetFiles(selectedPaths, width, height)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get files: %v", err)
+	}
 
-	return r.GetFiles(selectedPaths, width, height)
+	return images, nil
 }
 
 // Helper functions
@@ -151,10 +170,10 @@ func defaultFolder(folder, defaultPath string) string {
 	return folder
 }
 
-// isSupportedImage checks if a file is a supported image format.
+// isSupportedImage checks if a file is a supported image format (JPG/JPEG only).
 func isSupportedImage(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
-	return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif"
+	return ext == ".jpg" || ext == ".jpeg"
 }
 
 // randomSample selects a random sample of file paths.

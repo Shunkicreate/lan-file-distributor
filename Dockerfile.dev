@@ -4,6 +4,9 @@ FROM golang:1.23-alpine
 # 作業ディレクトリを設定
 WORKDIR /app
 
+# 必要なツールとライブラリをインストール
+RUN apk add --no-cache git gcc g++ make libjpeg-turbo-dev
+
 # 必要なツールをインストール（git、watchexec）
 RUN apk upgrade && \
     apk add git && \
