@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/nfnt/resize"
 	"image"
-	_ "image/gif"  // GIFサポートを追加
+	_ "image/gif"  // GIFサポート
 	_ "image/jpeg" // JPEGサポート
 	_ "image/png"  // PNGサポート
 	"io/ioutil"
@@ -13,158 +13,156 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 	"sync"
+	"time"
 )
 
 type FileRepository interface {
 	ListFiles(folder string) ([]model.File, error)
-	GetFile(path string, width uint, height uint) (image.Image, error)
-	GetFiles(paths []string, width uint, height uint) ([]image.Image, error)
+	GetFile(path string, width, height uint) (image.Image, error)
+	GetFiles(paths []string, width, height uint) ([]image.Image, error)
 	GetFilePaths(folder string) ([]string, error)
-	GetRandomFiles(folder string, count int, width uint, height uint) ([]image.Image, error)
+	GetRandomFiles(folder string, count int, width, height uint) ([]image.Image, error)
 }
 
 type fileRepository struct {
 	basePath string
 }
 
+// NewFileRepository creates a new instance of FileRepository
 func NewFileRepository(basePath string) FileRepository {
 	return &fileRepository{basePath: basePath}
 }
 
+// ListFiles retrieves a list of files in the specified folder.
 func (r *fileRepository) ListFiles(folder string) ([]model.File, error) {
-	if folder == "" {
-		folder = "/nas"
-	}
-	fullPath := filepath.Join(r.basePath, folder)
+	fullPath := filepath.Join(r.basePath, defaultFolder(folder, "/nas"))
 	files, err := ioutil.ReadDir(fullPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read directory: %v", err)
 	}
 
 	var result []model.File
-	for _, f := range files {
+	for _, file := range files {
 		result = append(result, model.File{
-			Name: f.Name(),
-			Path: folder + "/" + f.Name(),
-			Size: f.Size(),
+			Name: file.Name(),
+			Path: filepath.Join(folder, file.Name()),
+			Size: file.Size(),
 		})
 	}
 	return result, nil
 }
 
-func (r *fileRepository) GetFile(path string, width uint, height uint) (image.Image, error) {
-	fullPath := filepath.Join(r.basePath, path)
-	
-	// ファイル拡張子をチェック
-	ext := strings.ToLower(filepath.Ext(fullPath))
-	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".gif" {
-		return nil, fmt.Errorf("unsupported image format: %s", ext)
+// GetFile retrieves and optionally resizes a single image file.
+func (r *fileRepository) GetFile(path string, width, height uint) (image.Image, error) {
+	if !isSupportedImage(path) {
+		return nil, fmt.Errorf("unsupported image format: %s", filepath.Ext(path))
 	}
 
-	// ファイルを開く
-	file, err := os.Open(fullPath)
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %v", err)
 	}
 	defer file.Close()
 
-	// 画像をデコード
-	img, format, err := image.Decode(file)
+	img, _, err := image.Decode(file)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode image (%s format): %v", format, err)
+		return nil, fmt.Errorf("failed to decode image: %v", err)
 	}
 
-	// リサイズが指定されている場合
 	if width > 0 || height > 0 {
-		// リサイズ処理
-		resizedImg := resize.Resize(width, height, img, resize.Lanczos3)
-		return resizedImg, nil
+		return resize.Resize(width, height, img, resize.Lanczos3), nil
 	}
-
 	return img, nil
 }
 
-func (r *fileRepository) GetFiles(paths []string, width uint, height uint) ([]image.Image, error) {
-	var images = make([]image.Image, len(paths))
-	errChan := make(chan error, len(paths))
-	var wg sync.WaitGroup
-
+// GetFiles retrieves and optionally resizes multiple images concurrently.
+func (r *fileRepository) GetFiles(paths []string, width, height uint) ([]image.Image, error) {
+	var (
+		images   = make([]image.Image, len(paths))
+		errChan  = make(chan error, len(paths))
+		wg       sync.WaitGroup
+	)
 	for i, path := range paths {
 		wg.Add(1)
 		go func(index int, filePath string) {
 			defer wg.Done()
 			img, err := r.GetFile(filePath, width, height)
 			if err != nil {
-				errChan <- err
+				errChan <- fmt.Errorf("failed to process file %s: %v", filePath, err)
 				return
 			}
 			images[index] = img
 		}(i, path)
 	}
-
 	wg.Wait()
 	close(errChan)
 
-	// エラーチェック
 	if len(errChan) > 0 {
-		return nil, <-errChan // 最初のエラーを返す
+		return nil, <-errChan
 	}
-
 	return images, nil
 }
 
+// GetFilePaths retrieves all image file paths in a specified folder.
 func (r *fileRepository) GetFilePaths(folder string) ([]string, error) {
-	if folder == "" {
-		folder = os.Getenv("NAS_PATH")
-	}
-	fullPath := filepath.Join(r.basePath, folder)
-	
+	fullPath := filepath.Join(r.basePath, defaultFolder(folder, os.Getenv("NAS_PATH")))
+
 	files, err := ioutil.ReadDir(fullPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read directory: %v", err)
 	}
 
 	var paths []string
-	for _, f := range files {
-		if !f.IsDir() {
-			ext := strings.ToLower(filepath.Ext(f.Name()))
-			if ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif" {
-				path := filepath.Join(folder, f.Name())
-				paths = append(paths, path)
-			}
+	for _, file := range files {
+		if !file.IsDir() && isSupportedImage(file.Name()) {
+			fullFilePath := filepath.Join(fullPath, file.Name())
+			paths = append(paths, fullFilePath)
 		}
 	}
 
 	return paths, nil
 }
 
-func (r *fileRepository) GetRandomFiles(folder string, count int, width uint, height uint) ([]image.Image, error) {
-	// まず全てのファイルパスを取得
+// GetRandomFiles retrieves a specified number of random images.
+func (r *fileRepository) GetRandomFiles(folder string, count int, width, height uint) ([]image.Image, error) {
 	paths, err := r.GetFilePaths(folder)
 	if err != nil {
 		return nil, err
 	}
 
-	// ファイル数が要求数より少ない場合は、利用可能な最大数に調整
-	if len(paths) < count {
+	if count > len(paths) {
 		count = len(paths)
 	}
 
-	// ランダムに指定枚数を選択
 	rand.Seed(time.Now().UnixNano())
-	selectedPaths := make([]string, count)
+	selectedPaths := randomSample(paths, count)
+
+	return r.GetFiles(selectedPaths, width, height)
+}
+
+// Helper functions
+
+// defaultFolder returns a default folder if none is specified.
+func defaultFolder(folder, defaultPath string) string {
+	if folder == "" {
+		return defaultPath
+	}
+	return folder
+}
+
+// isSupportedImage checks if a file is a supported image format.
+func isSupportedImage(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+	return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif"
+}
+
+// randomSample selects a random sample of file paths.
+func randomSample(paths []string, count int) []string {
 	perm := rand.Perm(len(paths))
+	selected := make([]string, count)
 	for i := 0; i < count; i++ {
-		selectedPaths[i] = paths[perm[i]]
+		selected[i] = paths[perm[i]]
 	}
-
-	// 選択された画像を取得
-	images, err := r.GetFiles(selectedPaths, width, height)
-	if err != nil {
-		return nil, err
-	}
-
-	return images, nil
+	return selected
 }
