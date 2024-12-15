@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   app-prod:
-    container_name: photo_viewer_backend_prod
+    container_name: lan-file-distributor_prod
     build:
       context: .
       dockerfile: Dockerfile.prod  # 本番環境用のDockerfile

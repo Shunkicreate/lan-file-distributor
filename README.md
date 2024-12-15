@@ -22,3 +22,8 @@ docker compose -f docker-compose.prod.yml up --build
 ```
 docker compose -f docker-compose.prod.yml up
 ```
+
+## ライブラリ追加方法
+```
+docker compose -f docker-compose.dev.yml run --rm app-dev go get github.com/nfnt/resize
+```

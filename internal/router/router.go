@@ -23,7 +23,22 @@ func NewRouter(cfg *config.Config) *chi.Mux {
 	fileHandler := handler.NewFileHandler(fileService)
 
 	// ルート定義
-	r.Get("/files/{folder}", fileHandler.ListFiles)
+	r.Route("/api/files", func(r chi.Router) {
+		// ディレクトリ内のファイル一覧を取得
+		r.Get("/list/*", fileHandler.ListFiles)
+		
+		// 指定枚数のランダムな画像を取得 
+		r.Get("/random", fileHandler.GetRandomImages)
+		
+		// 特定の画像を取得（リサイズオプション付き）
+		r.Get("/image/*", fileHandler.GetImage)
+		
+		// 複数の特定画像を取得（リサイズオプション付き）
+		r.Post("/batch", fileHandler.GetMultipleImages)
+		
+		// ディレクトリ内の全ファイルパスを取得
+		r.Get("/paths/*", fileHandler.GetFilePaths)
+	})
 
 	return r
 }

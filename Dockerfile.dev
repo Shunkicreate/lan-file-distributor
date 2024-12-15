@@ -1,7 +1,19 @@
+# GoのAlpineベースイメージを使用
 FROM golang:1.23-alpine
 
 # 作業ディレクトリを設定
 WORKDIR /app
+
+# 必要なツールをインストール（git、watchexec）
+RUN apk upgrade && \
+    apk add git && \
+    apk add -X http://dl-cdn.alpinelinux.org/alpine/edge/community watchexec
+
+# Goモジュールの依存関係ファイルを先にコピー
+COPY go.mod go.sum ./
+
+# 依存関係をダウンロード
+RUN go mod tidy  # 依存関係を整理して不足分を解決
 
 # ソースコードをコピー
 COPY . .

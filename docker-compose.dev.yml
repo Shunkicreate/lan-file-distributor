@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   app-dev:
-    container_name: photo_viewer_backend_dev
+    container_name: lan-file-distributor_dev
     build:
       context: .
       dockerfile: Dockerfile.dev  # 開発環境用のDockerfile
