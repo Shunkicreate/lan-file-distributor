@@ -19,22 +19,37 @@ func NewFileHandler(fileRepo repository.FileRepository) *FileHandler {
 	return &FileHandler{fileRepo: fileRepo}
 }
 
+func AdjustDimensions(originalWidth, originalHeight uint, width, height uint) (uint, uint) {
+
+	if width == 0 && height == 0 {
+		if originalWidth > originalHeight {
+			return 1920, 1080
+		} else {
+			return 1080, 1920
+		}
+	} else if width == 0 {
+		ratio := float64(height) / float64(originalHeight)
+		return uint(float64(originalWidth) * ratio), height
+	} else if height == 0 {
+		ratio := float64(width) / float64(originalWidth)
+		return width, uint(float64(originalHeight) * ratio)
+	}
+	return width, height
+}
+
 func (h *FileHandler) GetRandomImages(w http.ResponseWriter, r *http.Request) {
 	count, _ := strconv.Atoi(r.URL.Query().Get("count"))
 	if count == 0 {
 		count = 1
 	}
 	width, _ := strconv.ParseUint(r.URL.Query().Get("width"), 10, 32)
-	if width == 0 {
-		width = 1080
-	}
 	height, _ := strconv.ParseUint(r.URL.Query().Get("height"), 10, 32)
-	if height == 0 {
-		height = 1920/4
-	}
+
+	adjustedWidth, adjustedHeight := AdjustDimensions(1920, 1080, uint(width), uint(height))
+
 	folder := ""
 
-	imageFiles, err := h.fileRepo.GetRandomFiles(folder, count, uint(width), uint(height))
+	imageFiles, err := h.fileRepo.GetRandomFiles(folder, count, adjustedWidth, adjustedHeight)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error getting random files: %v", err), http.StatusInternalServerError)
 		return
@@ -60,7 +75,9 @@ func (h *FileHandler) GetImage(w http.ResponseWriter, r *http.Request) {
 	width, _ := strconv.ParseUint(r.URL.Query().Get("width"), 10, 32)
 	height, _ := strconv.ParseUint(r.URL.Query().Get("height"), 10, 32)
 
-	imageFile, err := h.fileRepo.GetFile(path, uint(width), uint(height))
+	adjustedWidth, adjustedHeight := AdjustDimensions(1920, 1080, uint(width), uint(height))
+
+	imageFile, err := h.fileRepo.GetFile(path, adjustedWidth, adjustedHeight)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -88,7 +105,9 @@ func (h *FileHandler) GetMultipleImages(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	imageFiles, err := h.fileRepo.GetFiles(request.Paths, request.Width, request.Height)
+	adjustedWidth, adjustedHeight := AdjustDimensions(1920, 1080, request.Width, request.Height)
+
+	imageFiles, err := h.fileRepo.GetFiles(request.Paths, adjustedWidth, adjustedHeight)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
