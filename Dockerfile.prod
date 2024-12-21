@@ -1,22 +1,29 @@
-# 本番環境用ステージ
+# ビルダー環境 (そのまま維持)
 FROM golang:1.23-alpine AS builder
 
+# 必要なツールをインストール
+RUN apk add --no-cache git gcc g++ make libjpeg-turbo-dev
+
+# 作業ディレクトリを設定
 WORKDIR /app
 
 # ソースコードをコピー
 COPY . .
 
-# Goモジュールのインストール
+# 依存関係のインストール
 RUN go mod tidy
 
-# 本番用にバイナリをビルド
-RUN GOOS=linux GOARCH=amd64 go build -o api-server .
+# aarch64 (ARM 64-bit) 用のバイナリをビルド
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -o api-server ./cmd/server
 
-# 本番用ステージ
-FROM gcr.io/distroless/base
+# ランタイム環境
+FROM alpine:latest
+
+# 必要なランタイムライブラリをインストール
+RUN apk add --no-cache libjpeg-turbo
 
 # ビルドしたバイナリをコピー
 COPY --from=builder /app/api-server /api-server
 
-# バイナリを実行
+# 実行コマンド
 CMD ["/api-server"]

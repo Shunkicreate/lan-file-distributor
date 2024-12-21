@@ -7,7 +7,9 @@ services:
       context: .
       dockerfile: Dockerfile.prod  # 本番環境用のDockerfile
     ports:
-      - "8080:8080"
+      - "${PORT}:${PORT}"
     environment:
-      - ENV=production
+      - ENV=development
       - NAS_PATH=${NAS_PATH}
+      - PORT=${PORT}
+      - HOST_NAS_PATH=${HOST_NAS_PATH}
