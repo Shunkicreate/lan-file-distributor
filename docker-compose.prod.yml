@@ -6,6 +6,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.prod  # 本番環境用のDockerfile
+    volumes:
+      - "${HOST_NAS_PATH}:${NAS_PATH}"
     ports:
       - "${PORT}:${PORT}"
     environment:
