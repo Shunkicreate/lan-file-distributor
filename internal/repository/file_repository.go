@@ -56,6 +56,9 @@ func (r *fileRepository) GetFile(path string, width, height uint) (*model.ImageF
 	if !isSupportedImage(path) {
 		return nil, fmt.Errorf("unsupported image format (only JPG/JPEG supported): %s", path)
 	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
 
 	fileInfo, err := os.Stat(path)
 	if err != nil {

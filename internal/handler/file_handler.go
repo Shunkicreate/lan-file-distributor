@@ -71,7 +71,7 @@ func (h *FileHandler) GetRandomImages(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *FileHandler) GetImage(w http.ResponseWriter, r *http.Request) {
-	path := chi.URLParam(r, "path")
+    path := chi.URLParam(r, "*")
 	width, _ := strconv.ParseUint(r.URL.Query().Get("width"), 10, 32)
 	height, _ := strconv.ParseUint(r.URL.Query().Get("height"), 10, 32)
 
