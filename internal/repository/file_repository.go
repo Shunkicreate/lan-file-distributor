@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/nfnt/resize"
 	"github.com/pixiv/go-libjpeg/jpeg"
-	"image"
 	_ "image/jpeg" // JPEGサポートのみ残す
 	"io/ioutil"
 	"lan-file-distributor/internal/model"
