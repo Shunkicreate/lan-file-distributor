@@ -53,55 +53,60 @@ func (r *fileRepository) ListFiles(folder string) ([]model.File, error) {
 
 // GetFile retrieves and optionally resizes a single image file.
 func (r *fileRepository) GetFile(path string, width, height uint) (*model.ImageFile, error) {
-	if !isSupportedImage(path) {
-		return nil, fmt.Errorf("unsupported image format (only JPG/JPEG supported): %s", path)
-	}
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
-	}
+    if !isSupportedImage(path) {
+        return nil, fmt.Errorf("unsupported image format (only JPG/JPEG supported): %s", path)
+    }
+    if !strings.HasPrefix(path, "/") {
+        path = "/" + path
+    }
 
-	fileInfo, err := os.Stat(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get file info: %v", err)
-	}
+    fileInfo, err := os.Stat(path)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get file info: %v", err)
+    }
 
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %v", err)
-	}
-	defer file.Close()
+    file, err := os.Open(path)
+    if err != nil {
+        return nil, fmt.Errorf("failed to open file: %v", err)
+    }
+    defer file.Close()
 
-	options := &jpeg.DecoderOptions{
-		DCTMethod:              jpeg.DCTIFast,
-		DisableFancyUpsampling: true,
-		DisableBlockSmoothing:  true,
-		ScaleTarget: image.Rectangle{
-			Max: image.Point{
-				X: int(width),
-				Y: int(height),
-			},
-		},
-	}
+    options := &jpeg.DecoderOptions{
+        DCTMethod:              jpeg.DCTIFast,
+        DisableFancyUpsampling: true,
+        DisableBlockSmoothing:  true,
+    }
 
-	img, err := jpeg.Decode(file, options)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode image: %v", err)
-	}
+    img, err := jpeg.Decode(file, options)
+    if err != nil {
+        return nil, fmt.Errorf("failed to decode image: %v", err)
+    }
 
-	if (width > 0 || height > 0) && 
-	   (uint(img.Bounds().Dx()) != width || uint(img.Bounds().Dy()) != height) {
-		img = resize.Resize(width, height, img, resize.Lanczos3)
-	}
+    if width > 0 || height > 0 {
+        newWidth := width
+        newHeight := height
 
-	return &model.ImageFile{
-		Image:    img,
-		Path:     path,
-		Name:     filepath.Base(path),
-		Size:     fileInfo.Size(),
-		Width:    img.Bounds().Dx(),
-		Height:   img.Bounds().Dy(),
-	}, nil
+        if width == 0 {
+            // Width が 0 の場合、高さを基準にアスペクト比を維持
+            newWidth = uint(float64(img.Bounds().Dx()) * (float64(height) / float64(img.Bounds().Dy())))
+        } else if height == 0 {
+            // Height が 0 の場合、幅を基準にアスペクト比を維持
+            newHeight = uint(float64(img.Bounds().Dy()) * (float64(width) / float64(img.Bounds().Dx())))
+        }
+
+        img = resize.Resize(newWidth, newHeight, img, resize.Lanczos3)
+    }
+
+    return &model.ImageFile{
+        Image:    img,
+        Path:     path,
+        Name:     filepath.Base(path),
+        Size:     fileInfo.Size(),
+        Width:    img.Bounds().Dx(),
+        Height:   img.Bounds().Dy(),
+    }, nil
 }
+
 
 // GetFiles retrieves and optionally resizes multiple images concurrently.
 func (r *fileRepository) GetFiles(paths []string, width, height uint) ([]*model.ImageFile, error) {
