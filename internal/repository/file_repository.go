@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"bytes"
 )
 
 type FileRepository interface {
@@ -65,28 +66,28 @@ func (r *fileRepository) GetFile(path string, width, height uint) (*model.ImageF
         return nil, fmt.Errorf("failed to get file info: %v", err)
     }
 
-    file, err := os.Open(path)
-    if err != nil {
-        return nil, fmt.Errorf("failed to open file: %v", err)
-    }
-    defer file.Close()
-
-    options := &jpeg.DecoderOptions{
-        DCTMethod:              jpeg.DCTIFast,
-        DisableFancyUpsampling: true,
-        DisableBlockSmoothing:  true,
-    }
-
-    img, err := jpeg.Decode(file, options)
-    if err != nil {
-        return nil, fmt.Errorf("failed to decode image: %v", err)
-    }
-
-	// 回転修正
-	img, err = lib.FixOrientation(file, img)
+	fileBytes, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to correct orientation: %v", err)
+		return nil, fmt.Errorf("failed to read file: %v", err)
 	}
+
+	// 1回目の reader（EXIF読み取り用）
+	exifReader := bytes.NewReader(fileBytes)
+	orientation, err := lib.ExtractOrientation(exifReader)
+
+	// 2回目の reader（画像デコード用）
+	decodeReader := bytes.NewReader(fileBytes)
+	options := &jpeg.DecoderOptions{
+		DCTMethod:              jpeg.DCTIFast,
+		DisableFancyUpsampling: true,
+		DisableBlockSmoothing:  true,
+	}
+	img, err := jpeg.Decode(decodeReader, options)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode image: %v", err)
+	}
+
+	img = lib.RotateByOrientation(img, orientation)
 
     if width > 0 || height > 0 {
         newWidth := width
