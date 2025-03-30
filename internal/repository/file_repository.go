@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"lan-file-distributor/lib"
 )
 
 type FileRepository interface {
@@ -82,7 +83,7 @@ func (r *fileRepository) GetFile(path string, width, height uint) (*model.ImageF
     }
 
 	// 回転修正
-	img, err = fixOrientation(file, img)
+	img, err = lib.FixOrientation(file, img)
 	if err != nil {
 		return nil, fmt.Errorf("failed to correct orientation: %v", err)
 	}

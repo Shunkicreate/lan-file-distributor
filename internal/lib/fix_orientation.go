@@ -1,9 +1,14 @@
+// lib/fix_orientation.go
+package lib
+
 import (
 	"github.com/rwcarlsen/goexif/exif"
 	"github.com/disintegration/imaging"
+	"image"
+	"os"
 )
 
-func fixOrientation(file *os.File, img image.Image) (image.Image, error) {
+func FixOrientation(file *os.File, img image.Image) (image.Image, error) {
 	// Reset file pointer to beginning
 	file.Seek(0, 0)
 
