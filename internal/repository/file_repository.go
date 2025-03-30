@@ -72,8 +72,8 @@ func (r *fileRepository) GetFile(path string, width, height uint) (*model.ImageF
 	}
 
 	// 1回目の reader（EXIF読み取り用）
-	exifReader := bytes.NewReader(fileBytes)
-	orientation, err := lib.ExtractOrientation(exifReader)
+	// exifReader := bytes.NewReader(fileBytes)
+	// orientation, err := lib.ExtractOrientation(exifReader)
 
 	// 2回目の reader（画像デコード用）
 	decodeReader := bytes.NewReader(fileBytes)
@@ -87,7 +87,7 @@ func (r *fileRepository) GetFile(path string, width, height uint) (*model.ImageF
 		return nil, fmt.Errorf("failed to decode image: %v", err)
 	}
 
-	img = lib.RotateByOrientation(img, orientation)
+	// img = lib.RotateByOrientation(img, orientation)
 
     if width > 0 || height > 0 {
         newWidth := width
