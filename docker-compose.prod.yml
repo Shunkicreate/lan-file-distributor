@@ -3,7 +3,9 @@ version: '3.8'
 services:
   app-prod:
     container_name: lan-file-distributor_prod
-    image: shunkicreate/lan-file-distributor:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
     volumes:
       - "${HOST_NAS_PATH}:${NAS_PATH}"
     ports:

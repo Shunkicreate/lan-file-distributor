@@ -15,12 +15,12 @@ docker compose -f docker-compose.dev.yml up
 # 本番環境
 ## ローカルでビルドする
 ```
-docker compose -f docker-compose.prod.yml up --build
+docker compose -f docker-compose.prod.yml up --build -d
 ```
 
 ## ローカルで実行する
 ```
-docker compose -f docker-compose.prod.yml up
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ## ライブラリ追加方法
