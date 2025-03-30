@@ -81,6 +81,12 @@ func (r *fileRepository) GetFile(path string, width, height uint) (*model.ImageF
         return nil, fmt.Errorf("failed to decode image: %v", err)
     }
 
+	// 回転修正
+	img, err = fixOrientation(file, img)
+	if err != nil {
+		return nil, fmt.Errorf("failed to correct orientation: %v", err)
+	}
+
     if width > 0 || height > 0 {
         newWidth := width
         newHeight := height
