@@ -7,12 +7,12 @@ import (
 	_ "image/jpeg" // JPEGサポートのみ残す
 	"io/ioutil"
 	"lan-file-distributor/internal/model"
+	"lan-file-distributor/internal/lib"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-	"lan-file-distributor/lib"
 )
 
 type FileRepository interface {
